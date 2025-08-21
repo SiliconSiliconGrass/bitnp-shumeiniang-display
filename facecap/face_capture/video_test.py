@@ -108,7 +108,7 @@ while (capture.isOpened()):
 
         # 向后端发送POST请求，携带面部参数
         try:
-            response = requests.post(f'http://localhost:{BACKEND_PORT}/put', json={'faceParams': dict_params})
+            response = requests.post(f'http://localhost:{BACKEND_PORT}/put_face_params', json={'faceParams': dict_params})
             response.raise_for_status()    # 检查请求是否成功
         except requests.RequestException as e:
             print(f"请求发送失败: {e}")

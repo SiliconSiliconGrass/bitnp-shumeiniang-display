@@ -8,6 +8,7 @@ import time
 import numpy as np
 import mediapipe as mp
 import requests
+import base64
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -22,6 +23,8 @@ TASK_FILE_PATH = os.path.join(os.path.dirname(__file__), 'face_landmarker_v2_wit
 
 capture = cv2.VideoCapture(0) # 使用Mac的FaceTime摄像头
 # capture = cv2.VideoCapture(1) # 使用iPhone的摄像头(后摄)
+
+SHOW_VIDEO = False # 不需要使用cv2展示摄像头，因为前端会展示的。
 
 p_time = 0    # 上一帧的时间
 c_time = 0    # 下一帧的时间
@@ -73,6 +76,7 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 
     return annotated_image
 
+prev_dict_params = {}
 while (capture.isOpened()):
     retval, img = capture.read()
     try:
@@ -84,15 +88,20 @@ while (capture.isOpened()):
 
     img = draw_landmarks_on_image(img.numpy_view(), detection_result)
 
-    
+    img = img[:,::-1,:] # 镜像
 
+    # 转换为 Base64
+    _, buffer = cv2.imencode('.png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    img_base64 = base64.b64encode(buffer).decode('utf-8')
+
+    dict_params = {}
     if len(detection_result.face_blendshapes) >= 1:
         categories = detection_result.face_blendshapes[0]
         landmarks = detection_result.face_landmarks[0]
 
         pitch, yaw, roll = get_rotation(landmarks) # 计算头部旋转角度 (粗略近似)
 
-        dict_params = {}
+        
 
         dict_params["rotatePitch"] = pitch
         dict_params["rotateYaw"] = yaw
@@ -100,25 +109,31 @@ while (capture.isOpened()):
 
         for category in categories:
             dict_params[category.category_name] = category.score
+        
+        prev_dict_params = dict_params
+    else:
+        dict_params = prev_dict_params
 
-        # 向后端发送POST请求，携带面部参数
-        try:
-            response = requests.post(f'http://localhost:{BACKEND_PORT}/put', json={'faceParams': dict_params})
-            response.raise_for_status()    # 检查请求是否成功
-        except requests.RequestException as e:
-            print(f"请求发送失败: {e}")
-            pass
+    # 向后端发送POST请求，携带面部参数以及图像
+    try:
+        response = requests.post(f'http://localhost:{BACKEND_PORT}/put_face_params', json={'faceParams': dict_params, 'faceImage': img_base64})
+        response.raise_for_status()    # 检查请求是否成功
+    except requests.RequestException as e:
+        # print(f"请求发送失败: {e}") # debug
+        pass
 
     c_time = time.time()
     fps = 1 / (c_time - p_time)
     p_time = c_time
 
-    img = img[:,::-1,:] # 镜像
-
-    cv2.imshow("Video", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-    key = cv2.waitKey(1)
-    if key == 32:
-        break
+    
+    if SHOW_VIDEO:
+        cv2.imshow("Video", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        key = cv2.waitKey(1)
+        if key == 32:
+            break
 
 capture.release()
-cv2.destroyAllWindows()
+
+if SHOW_VIDEO:
+    cv2.destroyAllWindows()

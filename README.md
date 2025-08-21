@@ -7,11 +7,11 @@
 *开发时间有限，项目中的“frontend”和“backend”文件夹命名稍微有点乱，敬请谅解
 
 - `frontend` 展示前端
-- `backend` (SiliconVTuber 遗留产物, 暂时没啥用, 该展示项目不必运行其中的代码)
 - `facecap` 面捕
   - `facecap/frontend` 展示面捕得到的模型 (会以一个 `iframe` 的形式在展示前端中集成)
   - `facecap/face_capture` Python 调用摄像头进行面捕计算
   - `facecap/backend` 面捕后端, 用以实现 `facecap/frontend` 与 `facecap/face_capture` 的通信
+- `stt` 语音识别 (Speech To Text)
 
 _另外, 本项目还需要使用 GPTSoVITS 进行语音合成, 但并不在此仓库中_
 
@@ -23,6 +23,7 @@ _另外, 本项目还需要使用 GPTSoVITS 进行语音合成, 但并不在此�
 bash run_mac.sh
 ```
 它等同于顺次执行下述的所有命令。
+
 ---
 
 ### 1. 启动展示前端
@@ -71,6 +72,8 @@ python api_silicon.py
 *此处的代码中使用了我电脑上 GPT-SoVITS 的绝对路径, 在其他机器上请自行调整.
 
 GPT-SoVITS 将运行于 `9880` 端口
+
+---
 
 ### 6. 启动语音识别
 #### 6.1 启动语音识别麦克风

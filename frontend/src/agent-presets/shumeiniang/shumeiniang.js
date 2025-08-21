@@ -30,7 +30,7 @@ export function ShuMeiNiang(live2dCanvas, subtitle, transSubtitle, danmukuArea) 
             modelName: 'glm-4-flash-250414',
             systemPrompt: live2dPrompter(PROMPT, LIVE2D_CONFIG, 'zh')
         },
-        queryTemplate: 'Anon: %USER_INPUT% \n %PLUGIN_INFO% \n Soyo: ... (output your response directly)',
+        queryTemplate: '%USER_INPUT% \n %PLUGIN_INFO% \n',
 
         plugins: [
             [ActionQueue, {

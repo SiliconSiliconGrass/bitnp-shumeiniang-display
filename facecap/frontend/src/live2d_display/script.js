@@ -107,7 +107,7 @@ export async function live2d_setup(canvas, modelURL) {
     // 循环从服务器获取参数
     async function loopFetchParams() {
         try {
-            const url = `http://127.0.0.1:${BACKEND_PORT}/get`;
+            const url = `http://127.0.0.1:${BACKEND_PORT}/get_face_params`;
             const response = await fetch(url);
             let data = await response.json();
             data = data.faceParams

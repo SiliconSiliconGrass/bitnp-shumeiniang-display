@@ -1,6 +1,6 @@
 <template>
     <div>
-        <!-- <div class="background-image"></div> -->
+        <div class="background-image"></div>
         <div class="danmuku-area" ref="danmukuArea"></div>
         <div class="user-interface" id="user-interface">
             <!-- UI区域 -->
@@ -9,27 +9,55 @@
             <button @click="switchMicrophoneMode">{{ (microphoneOn) ? '闭麦' : '开麦' }}</button> -->
         </div>
 
+        <div ref="configUI" :class="showConfigUI ? 'config-ui' : 'config-ui config-ui-hidden'">
+            <!--  -->
+            <h1 class="config-title">设置菜单</h1>
+            <span>按“=”键随时唤出此菜单</span>
+            <br>
+            <br>
+
+            <label>
+                <input type="checkbox" v-model="enableDictation">
+                启用听写
+            </label><br>
+
+            <label>
+                <input type="checkbox" v-model="enableFullScreen">
+                全屏模式
+            </label><br>
+            
+        </div>
+
         <div class="subtitle-area">
-            <div class="subtitle-group">
-                <span ref="subtitle1" class="subtitle"></span>
-                <br>
-                <span ref="subtitle2" class="subtitle"></span>
-            </div>
-            <div class="subtitle-group">
-                <span ref="subtitle3" class="subtitle"></span>
-                <br>
-                <span ref="subtitle4" class="subtitle"></span>
+            <div ref="subtitleContainer1" class="subtitle-container subtitle-container-hidden">
+                <div ref="subtitleInnerContainer1" class="subtitle-inner-container">
+                    <span ref="subtitle1" class="subtitle"></span>
+                </div>
             </div>
         </div>
 
         <iframe 
-            ref="myIframe"
+            ref="faceCapIframe"
             src="http://localhost:9235/"
             class="iframe"
+            allowtransparency="true"
             @load="onIframeLoad"
         ></iframe>
 
-        <!-- {{ (this.agent) ? this.agent.userInputBuffer : ''}} -->
+        <!-- 摄像头图像显示 -->
+        <div class="camera-container">
+            <img class="camera-image" :src="imageSrc" />
+        </div>
+
+        <!-- 听写结果显示 -->
+        <div class="subtitle-area stt">
+            <div ref="subtitleContainerStt" class="subtitle-container stt subtitle-container-hidden">
+                <div ref="subtitleInnerContainerStt" class="subtitle-inner-container">
+                    <span ref="subtitleStt" class="subtitle"></span>
+                </div>
+            </div>
+        </div>
+
         <div class="canvas-container">
             <canvas ref="testCanvas1" id="leftCanvas" class="left-canvas"></canvas>
             <canvas ref="testCanvas2" id="rightCanvas" class="right-canvas"></canvas>
@@ -71,9 +99,6 @@
 
 <script>
 import { ShuMeiNiang } from '@/agent-presets/shumeiniang/shumeiniang';
-import { Soyo } from '@/agent-presets/soyo/soyo';
-import AudioRecognition from '@/components/AudioRecognition.vue';
-import { live2d_setup } from '@/components/temp/script'; // 动捕模型的脚本
 
 export default {
     components: {
@@ -85,11 +110,54 @@ export default {
             debug: false,
             audioEnabled: false, // The user needs to interact with the page (by clicking the button) to enable audio
 
-            turn: 0, // 表示当前是哪个角色在说话 (0表示soyo, 1表示anon)
+            imageSrc: "",
+
+            // app vars
+            showConfigUI: false,
+            enableDictation: false,
+            enableFullScreen: false,
         };
     },
 
+    watch: {
+        enableFullScreen(newVal) {
+            if (newVal) {
+                this.enterFullscreen();
+            } else {
+                this.exitFullscreen();
+            }
+        },
+    },
+
     methods: {
+        enterFullscreen() {
+            const element = document.documentElement; // 整个页面全屏
+            const requestMethod =
+                element.requestFullscreen ||
+                element.webkitRequestFullscreen ||
+                element.mozRequestFullScreen ||
+                element.msRequestFullscreen;
+
+            if (requestMethod) {
+                requestMethod.call(element).catch((err) => {
+                    console.error("全屏失败:", err);
+                    this.enableFullScreen = false; // 失败时重置状态
+                });
+            }
+        },
+
+        exitFullscreen() {
+            const exitMethod =
+                document.exitFullscreen ||
+                document.webkitExitFullscreen ||
+                document.mozCancelFullScreen ||
+                document.msExitFullscreen;
+
+            if (exitMethod) {
+                exitMethod.call(document);
+            }
+        },
+
         enableAudioActivities() {
             this.agent1.resourceManager.audioBank.handleUserGesture();
             // this.agent2.resourceManager.audioBank.handleUserGesture();
@@ -139,7 +207,7 @@ export default {
              * @param message String
              */
             // this.userInputBuffer.push(message);
-            this.agent.userInputBuffer.push(message);
+            this.agent1.userInputBuffer.push(message);
             console.log(`Add text: ${message}`);
         },
 
@@ -155,32 +223,42 @@ export default {
         let e = document.getElementById('user-interface');
         console.log(e);
 
-        const agent1 = ShuMeiNiang(this.$refs.testCanvas1, this.$refs.subtitle1, this.$refs.subtitle2, this.$refs.danmukuArea);
-        
-        // console.log(agent1);
-        // console.log(agent2);
-
-        // agent1.appendContext('你好呀');
-        // agent1.respondToContext()
-
-        // agent2.appendContext('请说“这是测试语音一”');
-        // console.log(agent2.messages);
-        // agent2.respondToContext()
-
-        // this.agent1 = agent1; // soyo
-        // this.agent2 = agent2; // anon
-
-        agent1.mainLoop(agent1);
-
+        const agent1 = ShuMeiNiang(this.$refs.testCanvas1, this.$refs.subtitle1, null, this.$refs.danmukuArea);
+        agent1.mainLoop(agent1); // 启动AI树莓娘
         this.agent1 = agent1;
 
+        console.log("agent", agent1); // debug
 
-        
+        // stt monitor vars        
         let sttTime = -1;
         let responseEndTime = Date.now();
         let sttText = "";
         let inResponse = false;
+        let prevEnableDictation = this.enableDictation;
         const STT_BACKEND_PORT = 9236;
+
+        // stt display
+        let displayIntervalId = null;
+        const subtitleSttEle = this.$refs.subtitleStt;
+        function displaySttText(text) {
+            clearInterval(displayIntervalId);
+
+            text = "(语音识别) " + text;
+            displayIntervalId = setInterval(() => {
+                let currLength = subtitleSttEle.innerHTML.length
+                if (currLength >= text.length) {
+                    let currContent = subtitleSttEle.innerHTML;
+                    setTimeout(() => {
+                        if (subtitleSttEle.innerHTML === currContent) {
+                            subtitleSttEle.innerHTML = "";
+                        }
+                    }, 5000)
+                    clearInterval(displayIntervalId);
+                    return;
+                }
+                subtitleSttEle.innerHTML += text[currLength];
+            }, 50);
+        }
 
         // stt input loop
         const sttLoopId = setInterval(() => {
@@ -195,12 +273,22 @@ export default {
                 // console.log('获取到的听写数据:', data); // debug
                 // 可根据需求添加处理获取到的JSON数据的逻辑
                 const dictationTime = data.time * 1000;
-                if (!inResponse && dictationTime > sttTime && dictationTime - responseEndTime >= 1000) {
+
+                if (!prevEnableDictation && this.enableDictation) {
+                    responseEndTime = Date.now();
+                }
+
+                if (!inResponse && this.enableDictation && dictationTime > sttTime && dictationTime - responseEndTime >= 1000) {
                     sttTime = data.time;
                     sttText = data.dictation;
-                    agent1.userInputBuffer.push(sttText);
+                    
+                    // commit stt text
+                    this.recordChat(sttText);
+                    displaySttText(sttText);
+
                     console.log("Add stt text:", sttText); // debug
                 }
+                prevEnableDictation = this.enableDictation;
             })
             .catch(error => {
                 console.error('Error occurred when getting dictation data:', error);
@@ -209,24 +297,72 @@ export default {
 
         const self = this;
 
+        // handle start of response
         agent1.addEventListener('start_of_response', (e) => {
-            // handle start of response
             inResponse = true;
         })
 
+        // handle end of response
         agent1.addEventListener('end_of_response', (e) => {
-            // handle end of response
+            inResponse = false;
             const response = e.detail.response;
-            console.log("END OF RESPONSE")
-
             const now = Date.now();
             responseEndTime = now;
-            inResponse = false;
         });
 
-        agent1.userInputBuffer.push('[系统提示：外场活动开始了，给大家打个招呼吧，并且招揽同学们加入网协！！！]'); // 开头
 
+        // show config ui by keyboard
+        document.addEventListener("keydown", (e) => {
+            if (e.key === '=') {
+                this.showConfigUI = !this.showConfigUI;
+            }
+        });
 
+        // subtitle container monitor
+        const subtitleMonitorId = setInterval(() => {
+            if (this.$refs.subtitle1.innerHTML !== "") {
+                this.$refs.subtitleContainer1.className = "subtitle-container"
+            } else {
+                this.$refs.subtitleContainer1.className = "subtitle-container subtitle-container-hidden"
+            }
+            this.$refs.subtitleInnerContainer1.scrollTo({
+                top: this.$refs.subtitleInnerContainer1.scrollHeight,
+                behavior: 'smooth' // 平滑滚动
+            });
+        }, 100);
+
+        // subtitle stt container monitor
+        const subtitleSttMonitorId = setInterval(() => {
+            if (this.$refs.subtitleStt.innerHTML !== "") {
+                this.$refs.subtitleContainerStt.className = "subtitle-container stt"
+            } else {
+                this.$refs.subtitleContainerStt.className = "subtitle-container stt subtitle-container-hidden"
+            }
+            this.$refs.subtitleInnerContainerStt.scrollTo({
+                top: this.$refs.subtitleInnerContainerStt.scrollHeight,
+                behavior: 'smooth' // 平滑滚动
+            });
+        }, 100);
+
+        // fetch camera image
+        async function fetchImage() {
+            try {
+                const response = await fetch('http://localhost:9234/get_face_image')
+                const data = await response.json()
+                self.imageSrc = `data:image/png;base64,${data.faceImage}` // 关键：添加 Data URL 前缀
+            } catch (error) {
+                console.error('获取图片失败:', error)
+            }
+        }
+
+        setTimeout(() => {
+            const fetchImageLoopId = setInterval(() => {
+                fetchImage()
+            }, 30);
+        }, 1000);
+        
+
+        // this.recordChat('[系统提示：外场活动开始了，给大家打个招呼吧，并且招揽同学们加入网协！！！]'); // 开头
     },
 };
 </script>
@@ -257,6 +393,7 @@ export default {
 }
 
 .canvas-container {
+    box-sizing: content-box;
     position: fixed;
     margin: 0;
     padding: 0;
@@ -348,24 +485,118 @@ export default {
 }
 
 .subtitle-area {
-    position: absolute;
+    position: fixed;
     z-index: 998;
     margin: 0;
+    left: 0;
     padding: 0;
-    width: 100vw;
+    width: 50vw;
     height: 100vh;
     display: flex;
     justify-content: center;
     align-items: last baseline;
+
+    perspective: 1000px; /* 3D 透视焦距 */
+}
+
+@keyframes subtitle-hover {
+    0% { transform: rotateY(20deg) rotateX(-20deg) translate(100px, -300px);}
+    25% { transform: rotateY(25deg) rotateX(-15deg) translate(100px, -280px);}
+    50% { transform: rotateY(20deg) rotateX(-20deg) translate(100px, -300px);}
+    75% { transform: rotateY(15deg) rotateX(-25deg) translate(100px, -320px);}
+    100% { transform: rotateY(20deg) rotateX(-20deg) translate(100px, -300px);}
+}
+
+@keyframes subtitle-hide {
+    0% { transform: rotateY(20deg) rotateX(-20deg) translate(100px, -300px);}
+    100% { transform: rotateY(0deg) rotateX(90deg) translate(0, 0);}
+}
+
+.subtitle-container {
+    margin-left: 10%;
+    width: 80%;
+    margin-right: 10%;
+
+    padding-top: 20px;
+    padding-bottom: 30px;
+    padding-left: 40px;
+    padding-right: 40px;
+
+    text-align: left;
+
+    aspect-ratio: 907/200;
+    background-image: url("@/assets/tooltip.png");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+
+    opacity: 1;
+    z-index: 1000;
+    transform-style: preserve-3d;
+    transform: rotateY(20deg) rotateX(-20deg) translate(100px, -300px);
+    animation: subtitle-hover 10s infinite linear 0.5s;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.subtitle-container-hidden {
+    opacity: 0;
+    transform: rotateY(20deg) rotateX(90deg) translate(0, 0);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    animation: subtitle-hide 0.5s ease-out;
+}
+
+.subtitle-inner-container {
+    width: 100%;
+    height: 100%;
+    overflow-y: scroll;
+}
+.subtitle-inner-container::-webkit-scrollbar {
+  display: none; /* 完全隐藏滚动条 */
 }
 
 .subtitle {
-    font-size: 3em;
+    font-size: 2em;
     font-weight: 1000;
-    -webkit-text-stroke: 1px white;
-    text-shadow: 5px 5px rgb(43, 38, 43);
+    -webkit-text-stroke: 1px rgb(255, 255, 255);
+    text-shadow: 2px 2px rgb(43, 38, 43);
     user-select: none;
-    color: #d459b9;
+    color: rgb(56, 225, 255);
+}
+
+/* stt subtitle container */
+
+@keyframes subtitle-hover-stt {
+    0% { transform: rotateY(-20deg) rotateX(-20deg) translate(-100px, 0);}
+    25% { transform: rotateY(-25deg) rotateX(-15deg) translate(-100px, 0);}
+    50% { transform: rotateY(-20deg) rotateX(-20deg) translate(-100px, 0);}
+    75% { transform: rotateY(-15deg) rotateX(-25deg) translate(-100px, 0);}
+    100% { transform: rotateY(-20deg) rotateX(-20deg) translate(-100px, 0);}
+}
+
+@keyframes subtitle-hide-stt {
+    0% { transform: rotateY(-20deg) rotateX(-20deg) translate(100px, 0);}
+    100% { transform: rotateY(0deg) rotateX(90deg) translate(0, 0);}
+}
+
+.subtitle-area.stt {
+    position: fixed;
+    margin: 0;
+    left: 50vw;
+    padding-top: 10vh;
+    width: 50vw;
+    height: 100vh;
+
+    align-items: first baseline;
+}
+.subtitle-container.stt {
+    transform: rotateY(-20deg) rotateX(-20deg) translate(-100px, 0);
+    animation: none;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    animation: subtitle-hover-stt 10s infinite linear 0.5s;
+}
+
+.subtitle-container-hidden.stt {
+    transform: rotateY(-20deg) rotateX(90deg) translate(0, 0);
+    animation: subtitle-hide-stt 0.5s ease-out;
 }
 
 .visualize-area {
@@ -411,8 +642,8 @@ export default {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: url('@/assets/bg01020.png');
-    /* 替换为你的图片路径 */
+    /* background-image: url('@/assets/bg01020.png'); */
+    background: linear-gradient(to top, rgb(4, 4, 38), rgb(44, 26, 90));
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
@@ -422,9 +653,46 @@ export default {
 .iframe {
     position: fixed;
     border: none;
+    background-color: transparent;
+    z-index: 998;
     top: 0;
     right: 0;
     width: 50vw;
     height: 100vh;
+}
+
+.config-ui {
+    border: #2c3e50;
+    background-color: rgb(28, 0, 57);
+    border-radius: 10px;
+    padding: 10px;
+    color: white;
+    position: fixed;
+    top: 25vh;
+    left: 25vw;
+    width: 50vw;
+    height: 50vh;
+    opacity: 1;
+    z-index: 9999;
+    transform: translate(0, 0);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.config-ui-hidden {
+    opacity: 0;
+    transform: translate(0, 100px)
+}
+
+.camera-container {
+    z-index: 5;
+    position: fixed;
+    right: 0vw;
+    width: 25vw;
+}
+
+.camera-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
 }
 </style>
