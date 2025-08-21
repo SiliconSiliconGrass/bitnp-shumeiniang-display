@@ -9,6 +9,8 @@
             <button @click="switchMicrophoneMode">{{ (microphoneOn) ? '闭麦' : '开麦' }}</button> -->
         </div>
 
+        <div class="logo-background"></div>
+
         <div ref="configUI" :class="showConfigUI ? 'config-ui' : 'config-ui config-ui-hidden'">
             <!--  -->
             <h1 class="config-title">设置菜单</h1>
@@ -126,7 +128,7 @@ export default {
             } else {
                 this.exitFullscreen();
             }
-        },
+        }
     },
 
     methods: {
@@ -162,25 +164,6 @@ export default {
             this.agent1.resourceManager.audioBank.handleUserGesture();
             // this.agent2.resourceManager.audioBank.handleUserGesture();
             this.audioEnabled = true;
-
-            // // start bgm
-            // const audio = this.$refs.bgmAudio
-            // audio.play().catch(e => {
-            //     console.log('BGM Audio error:', e)
-            // });
-            // audio.volume = 0.1;
-            // audio.muted = false;
-        },
-
-        switchMicrophoneMode() {
-            if (this.microphoneOn) {
-                this.audioRecognition.pause();
-                this.microphoneOn = false;
-            } else {
-                this.audioRecognition.resume();
-                this.microphoneOn = true;
-                // this.interrupt();
-            }
         },
 
         // interrupt() {
@@ -211,25 +194,64 @@ export default {
             console.log(`Add text: ${message}`);
         },
 
+        /**
+         * 暂停听写功能，向语音识别后端的 /message 接口发送 POST 请求
+         * 将 enableDictation 参数设为 false
+         */
+        async pauseDictation() {
+            try {
+                const response = await fetch('http://localhost:9236/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ enableDictation: false }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`请求失败，状态码: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('暂停听写请求出错:', error);
+            }
+        },
+
+        /**
+         * 继续/启用听写功能，向语音识别后端的 /message 接口发送 POST 请求
+         * 将 enableDictation 参数设为 true
+         */
+        async resumeDictation() {
+            try {
+                const response = await fetch('http://localhost:9236/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ enableDictation: true }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`请求失败，状态码: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('暂停听写请求出错:', error);
+            }
+        },
+
     },
 
     mounted() {
+        const self = this;
 
-        // this.audioRecognition = new AudioRecognition((text) => {
-        //     console.log("[AudioRecognition] " + text);
-        // });
-        // this.audioRecognition.launch()
-
-        let e = document.getElementById('user-interface');
-        console.log(e);
-
+        // 0. Agent Setup
         const agent1 = ShuMeiNiang(this.$refs.testCanvas1, this.$refs.subtitle1, null, this.$refs.danmukuArea);
         agent1.mainLoop(agent1); // 启动AI树莓娘
         this.agent1 = agent1;
 
         console.log("agent", agent1); // debug
 
-        // stt monitor vars        
+        // 1. STT Management
+        // 1.1 stt monitor vars        
         let sttTime = -1;
         let responseEndTime = Date.now();
         let sttText = "";
@@ -237,7 +259,7 @@ export default {
         let prevEnableDictation = this.enableDictation;
         const STT_BACKEND_PORT = 9236;
 
-        // stt display
+        // 1.2 stt subtitle display
         let displayIntervalId = null;
         const subtitleSttEle = this.$refs.subtitleStt;
         function displaySttText(text) {
@@ -260,7 +282,7 @@ export default {
             }, 50);
         }
 
-        // stt input loop
+        // 1.3 stt input loop
         const sttLoopId = setInterval(() => {
             fetch(`http://localhost:${STT_BACKEND_PORT}/get_dictation`)
             .then(response => {
@@ -295,30 +317,43 @@ export default {
             });
         }, 100);
 
-        const self = this;
+        // 1.4 stt message sender loop
+        const sttMessageSenderLoopId = setInterval(() => {
+            if (self.enableDictation && !inResponse) {
+                self.resumeDictation();
+            } else {
+                self.pauseDictation();
+            }
+        }, 1000);
 
-        // handle start of response
+        // 2. Agent Event Handlers
+        // 2.1 handle start of response
         agent1.addEventListener('start_of_response', (e) => {
             inResponse = true;
-        })
+            self.pauseDictation(); // 在AI说话期间禁用语音识别
+        });
 
-        // handle end of response
+        // 2.2 handle end of response
         agent1.addEventListener('end_of_response', (e) => {
             inResponse = false;
             const response = e.detail.response;
             const now = Date.now();
             responseEndTime = now;
+
+            if (self.enableDictation) {
+                self.resumeDictation();
+            }
         });
 
-
-        // show config ui by keyboard
+        // 3. show config ui by keyboard
         document.addEventListener("keydown", (e) => {
             if (e.key === '=') {
                 this.showConfigUI = !this.showConfigUI;
             }
         });
 
-        // subtitle container monitor
+        // 4. Subtitle Container Animations
+        // 4.1 agent subtitle container monitor
         const subtitleMonitorId = setInterval(() => {
             if (this.$refs.subtitle1.innerHTML !== "") {
                 this.$refs.subtitleContainer1.className = "subtitle-container"
@@ -331,7 +366,7 @@ export default {
             });
         }, 100);
 
-        // subtitle stt container monitor
+        // 4.2 subtitle stt container monitor
         const subtitleSttMonitorId = setInterval(() => {
             if (this.$refs.subtitleStt.innerHTML !== "") {
                 this.$refs.subtitleContainerStt.className = "subtitle-container stt"
@@ -344,7 +379,8 @@ export default {
             });
         }, 100);
 
-        // fetch camera image
+        // 5. Face Capture
+        // 5.1 fetch camera image
         async function fetchImage() {
             try {
                 const response = await fetch('http://localhost:9234/get_face_image')
@@ -354,13 +390,11 @@ export default {
                 console.error('获取图片失败:', error)
             }
         }
-
         setTimeout(() => {
             const fetchImageLoopId = setInterval(() => {
                 fetchImage()
             }, 30);
         }, 1000);
-        
 
         // this.recordChat('[系统提示：外场活动开始了，给大家打个招呼吧，并且招揽同学们加入网协！！！]'); // 开头
     },
@@ -694,5 +728,17 @@ export default {
     width: 100%;
     height: 100%;
     border-radius: 10px;
+}
+
+.logo-background {
+    position: fixed;
+    width: 30vw;
+    left: 35vw;
+    top: 20vh;
+    aspect-ratio: 647/493;
+
+    background-image: url("@/assets/logo_background.png");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
 }
 </style>

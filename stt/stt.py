@@ -32,12 +32,20 @@ vad_buffer = np.zeros(CHUNK_SIZE, dtype=np.float32)
 speech_buffer = np.array([], dtype=np.float32)
 recording = False
 speech_ends = False
+enable_dictation = True
 buffer_lock = Lock()  # 用于线程安全的锁
 test_file_count = 0
 
 def vad_callback(indata, frames, time, status):
     """麦克风音频回调函数"""
-    global vad_model, vad_buffer, recording, speech_buffer, speech_ends, buffer_lock
+    global enable_dictation, vad_model, vad_buffer, recording, speech_buffer, speech_ends, buffer_lock
+
+    if not enable_dictation:
+        with buffer_lock:
+            vad_buffer = np.zeros(CHUNK_SIZE, dtype=np.float32)
+            speech_buffer = np.array([], dtype=np.float32)
+            recording = False
+        return
 
     if status.input_overflow:
         print("⚠️ 输入溢出！数据丢失")
@@ -89,19 +97,31 @@ with sd.InputStream(
 ):
     try:
         while True:
+            # 从后端的/get_message端口获取enableDictation参数
+            try:
+                response = requests.get(f'http://localhost:{STT_BACKEND_PORT}/get_message')
+                response.raise_for_status()  # 检查请求是否成功
+                data = response.json()
+                enable_dictation = data.get('enableDictation', True)  # 默认值设为True
+
+            except requests.RequestException as e:
+                print(f"获取enableDictation参数失败: {e}")
+                continue
+
+            # 进行语音识别
             if speech_ends:
                 speech_ends = False
-                
+
                 # 拷贝当前语音缓冲区的完整内容
                 with buffer_lock:
                     current_speech = speech_buffer.copy()
                     speech_buffer = np.array([], dtype=np.float32)  # 重置缓冲区
-                
+
                 # 保存和识别
                 if len(current_speech) > 0:
-                    # sf.write(f"test/test_file{test_file_count}.wav", current_speech, SAMPLE_RATE)
-                    test_file_count += 1
-                    
+                    # sf.write(f"test/test_file{test_file_count}.wav", current_speech, SAMPLE_RATE) # debug
+                    # test_file_count += 1
+
                     result = stt_model.generate(
                         input=current_speech,
                         audio_fs=SAMPLE_RATE,
@@ -117,7 +137,7 @@ with sd.InputStream(
                         print(f"发送结果成功，状态码: {response.status_code}")
                     except requests.RequestException as e:
                         print(f"发送结果失败: {e}")
-                    
-            time.sleep(0.1)  # 降低CPU占用
+
+            time.sleep(0.1) # 降低CPU占用
     except KeyboardInterrupt:
         print("停止检测")
