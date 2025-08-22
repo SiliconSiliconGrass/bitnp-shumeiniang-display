@@ -154,18 +154,34 @@ export default class L2dDisplay extends AbstractPlugin {
             let name = action.data;
             if (name in this.motionDict) {
                 this.launchMotion(name);
+
+                const coreModel = model.internalModel.coreModel;
+
+                const RESTORE_DELAY_DICT = {
+                    '流汗': 4000,
+                    '摇头': 6800,
+                    '招手': 4000,
+                    '指': 4000
+                };
+
+                const delaySeconds = RESTORE_DELAY_DICT[name];
+
+                setTimeout(() => {
+                    // restore model state
+                    // only for shumeiniang (Fuck DAver Live2D maker!)
+                    
+                    coreModel.setParameterValueById("Param14", 0); // Hand Pointing
+                    coreModel.setParameterValueById("ParamSweat", 0); // Sweat
+
+                    // 最好做一下平滑化。不过根本问题在于Live2D模型的动作没有实现参数复位
+                    coreModel.setParameterValueById("ParamAngleX", 0);
+                    coreModel.setParameterValueById("ParamAngleY", 0);
+                    coreModel.setParameterValueById("ParamAngleZ", 0);
+                }, delaySeconds);
+
                 await delay(this.motionDict[name].duration);
 
-                // restore model state
-                // only for shumeiniang (Fuck DAver Live2D maker!)
-                const coreModel = model.internalModel.coreModel;
-                coreModel.setParameterValueById("Param14", 0); // Hand Pointing
-                coreModel.setParameterValueById("ParamSweat", 0); // Sweat
-
-                // 最好做一下平滑化。不过根本问题在于Live2D模型的动作没有实现参数复位
-                coreModel.setParameterValueById("ParamAngleX", 0);
-                coreModel.setParameterValueById("ParamAngleY", 0);
-                coreModel.setParameterValueById("ParamAngleZ", 0);
+                
 
             } else if (name in this.expressionDict) {
                 this.setExpression(name);

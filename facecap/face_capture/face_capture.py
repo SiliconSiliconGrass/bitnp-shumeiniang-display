@@ -21,8 +21,8 @@ from utils import *
 BACKEND_PORT = 9234 # facecap backend port
 TASK_FILE_PATH = os.path.join(os.path.dirname(__file__), 'face_landmarker_v2_with_blendshapes.task')
 
-capture = cv2.VideoCapture(0) # 使用Mac的FaceTime摄像头
-# capture = cv2.VideoCapture(1) # 使用iPhone的摄像头(后摄)
+# capture = cv2.VideoCapture(0) # 使用Mac的FaceTime摄像头
+capture = cv2.VideoCapture(1) # 使用iPhone的摄像头(后摄)
 
 SHOW_VIDEO = False # 不需要使用cv2展示摄像头，因为前端会展示的。
 
