@@ -22,3 +22,17 @@ def get_rotation(landmarks):
     # print(f"{pitch=}, {yaw=}, {roll=}") # debug
 
     return pitch, yaw, roll
+
+def get_face_position_and_size(landmarks):
+    p1 = landmarks[10] # top
+    p2 = landmarks[152] # bottom
+    p3 = landmarks[234] # left
+    p4 = landmarks[454] # right
+    p5 = landmarks[4] # nose tip
+
+    x = (p3.x + p4.x + p5.x) / 3
+    y = (p1.y + p2.y) / 2
+
+    size = np.linalg.norm(np.array([p1.x, p1.y]) - np.array([p2.x, p2.y]))
+
+    return x, y, size

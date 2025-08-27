@@ -32,7 +32,7 @@ vad_buffer = np.zeros(CHUNK_SIZE, dtype=np.float32)
 speech_buffer = np.array([], dtype=np.float32)
 recording = False
 speech_ends = False
-enable_dictation = True
+enable_dictation = False # 初始化时禁用stt，需要前端信号来开启
 buffer_lock = Lock()  # 用于线程安全的锁
 test_file_count = 0
 
