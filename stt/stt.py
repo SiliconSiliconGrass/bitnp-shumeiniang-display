@@ -12,10 +12,19 @@ from silero_vad import load_silero_vad, get_speech_timestamps
 
 STT_BACKEND_PORT = 9236 # stt backend port
 
+DEVICE_INDEX = 1 # 使用 iPhone 麦克风
+# DEVICE_INDEX = 3 # 使用 Mac 麦克风
+
 # 初始化模型
-vad_model = load_silero_vad()
+vad_model = load_silero_vad() # 语音检测模型 (VAD)
 stt_model = AutoModel(
-    model="paraformer-zh",
+    model="paraformer-zh",  # 语音识别模型 (STT)
+    disable_log=True,
+    disable_update=True
+)
+
+punc_model = AutoModel(
+    model="ct-punc-c", # 标点恢复模型
     disable_log=True,
     disable_update=True
 )
@@ -86,9 +95,22 @@ def vad_callback(indata, frames, time, status):
         speech_ends = True
         print(f"🔇 语音结束 @ {t.strftime('%H:%M:%S', t.localtime(t.time()))}")
 
+
+# # 查看所有音频设备
+# # debug
+# devices = sd.query_devices()
+# print("所有音频设备:")
+# for i, device in enumerate(devices):
+#     print(f"设备索引 {i}: {device['name']}")
+#     print(f"  最大输入通道: {device['max_input_channels']}")
+#     print(f"  最大输出通道: {device['max_output_channels']}")
+#     print(f"  默认采样率: {device['default_samplerate']}")
+#     print("  ---")
+
 # 开始实时流式检测
 print("开始流式VAD检测 (按Ctrl+C停止)...")
 with sd.InputStream(
+    device=DEVICE_INDEX,
     samplerate=SAMPLE_RATE,
     blocksize=FRAME_SIZE,
     channels=1,
@@ -105,7 +127,7 @@ with sd.InputStream(
                 enable_dictation = data.get('enableDictation', True)  # 默认值设为True
 
             except requests.RequestException as e:
-                print(f"获取enableDictation参数失败: {e}")
+                # print(f"获取enableDictation参数失败: {e}") # debug
                 continue
 
             # 进行语音识别
@@ -127,16 +149,28 @@ with sd.InputStream(
                         audio_fs=SAMPLE_RATE,
                         batch_size=1
                     )
+                    # breakpoint()
                     print(f"识别结果: {result[0]['text'] if result else '无结果'}")
 
                     result = result[0]['text'] if result else ""
+
+                    if result != "":
+                        result = punc_model.generate(
+                            input=result,
+                            batch_size=1,
+                            task='punc'
+                        )
+
+                        result = result[0]['text']
+
                     try:
                         # 将识别结果发送到9236端口的/put_dictation接口
                         response = requests.post(f'http://localhost:{STT_BACKEND_PORT}/put_dictation', json={'dictation': result})
                         response.raise_for_status()  # 检查请求是否成功
                         print(f"发送结果成功，状态码: {response.status_code}")
                     except requests.RequestException as e:
-                        print(f"发送结果失败: {e}")
+                        # print(f"发送结果失败: {e}") # debug
+                        pass
 
             time.sleep(0.1) # 降低CPU占用
     except KeyboardInterrupt:
