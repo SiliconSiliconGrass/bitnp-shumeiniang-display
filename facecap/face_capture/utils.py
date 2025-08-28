@@ -36,3 +36,19 @@ def get_face_position_and_size(landmarks):
     size = np.linalg.norm(np.array([p1.x, p1.y]) - np.array([p2.x, p2.y]))
 
     return x, y, size
+
+def get_mouth_width(landmarks):
+    p1 = landmarks[61] # 左嘴角
+    p2 = landmarks[291] # 右嘴角
+
+    abs_mouth_width = np.linalg.norm(np.array([p1.x, p1.y]) - np.array([p2.x, p2.y]))
+
+    p3 = landmarks[234] # left
+    p4 = landmarks[454] # right
+    face_width = np.linalg.norm(np.array([p3.x, p3.y]) - np.array([p4.x, p4.y]))
+
+    mouth_width = abs_mouth_width / face_width
+
+    # print("get_mouth_width", abs_mouth_width, face_width, mouth_width)
+
+    return mouth_width

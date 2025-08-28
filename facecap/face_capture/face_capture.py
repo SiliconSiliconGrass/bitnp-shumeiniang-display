@@ -90,6 +90,18 @@ while (capture.isOpened()):
 
     img = img[:,::-1,:] # 镜像
 
+    # # debug: draw points with index
+    # img = img.copy()
+    # if len(detection_result.face_landmarks) > 0:
+    #     list_index = [61, 291]
+    #     # for index, point in enumerate(detection_result.face_landmarks[0]):
+    #     for index in list_index:
+    #         point = detection_result.face_landmarks[0][index]
+    #         x = int((1 - point.x) * img.shape[1])
+    #         y = int(point.y * img.shape[0])
+    #         img = cv2.circle(img, (x, y), 3, (255,0,0), -1)
+    #         img = cv2.putText(img, f"{index}", (x,y), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
+
     # 转换为 Base64
     _, buffer = cv2.imencode('.png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
     img_base64 = base64.b64encode(buffer).decode('utf-8')
@@ -101,6 +113,7 @@ while (capture.isOpened()):
 
         pitch, yaw, roll = get_rotation(landmarks) # 计算头部旋转角度 (粗略近似)
         pos_x, pos_y, face_size = get_face_position_and_size(landmarks)
+        mouth_width = get_mouth_width(landmarks)
         face_size /= np.cos(pitch / 180 * np.pi)
 
         dict_params["rotatePitch"] = pitch
@@ -110,6 +123,7 @@ while (capture.isOpened()):
         dict_params["positionX"] = pos_x
         dict_params["positionY"] = pos_y
         dict_params["faceSize"] = face_size
+        dict_params["mouthWidth"] = mouth_width
 
         for category in categories:
             dict_params[category.category_name] = category.score

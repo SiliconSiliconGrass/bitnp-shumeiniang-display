@@ -3,7 +3,7 @@
 
   <!-- param visualization -->
   <div class="slider-area-left" v-if="debug">
-    <div v-for="(item, index) in modelSliders" v-bind:key="index" class="slider-container">
+    <div class="slider-container" v-for="(item, index) in modelSliders" v-bind:key="index">
       <input
         type="range" 
         v-model="modelSliders[index].value" 

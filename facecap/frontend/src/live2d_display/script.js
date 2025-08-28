@@ -38,10 +38,12 @@ const PARAM_TRANSFER_MAP = [
     new ParamTransfer("eyeBlinkRight", "ParamEyeROpen", -2, 1, 1),
 
     // 张嘴
-    new ParamTransfer("jawOpen", "ParamMouthOpenY", 4, 0, 0),
+    new ParamTransfer("jawOpen", "ParamMouthOpenY", 2, 0, 0),
+    // 口型
+    new ParamTransfer("mouthWidth", "ParamMouthForm", 1 / 0.11, -3.45, 0),
 
     // 头部运动
-    new ParamTransfer("rotatePitch", "ParamAngleY", 1, 0, 0),
+    new ParamTransfer("rotatePitch", "ParamAngleY", 2, 0, 0),
     new ParamTransfer("rotateYaw", "ParamAngleX", -1, 0, 0),
     new ParamTransfer("rotateRoll", "ParamAngleZ", 1, 0, 0),
 
@@ -57,7 +59,7 @@ const PARAM_TRANSFER_MAP = [
     // new ParamTransfer("faceSize", "modelScale", 2, 0, 1), // 效果不佳，因为脸的大小总会发生变化
 
     // 模型位移
-    new ParamTransfer("rotatePitch", "modelTranslateY", -0.003, 0, 0),
+    new ParamTransfer("rotatePitch", "modelTranslateY", -0.001, 0, 0),
 
     // 模型旋转
     new ParamTransfer("rotateRoll", "modelRotation", 0.003, 0, 0),
@@ -228,7 +230,8 @@ export async function live2d_setup(canvas, modelURL, vueCore) {
         } catch (error) {
             console.error('获取参数时出错:', error);
         } finally {
-            setTimeout(loopFetchParams, 10);
+            requestAnimationFrame(loopFetchParams);
+            // setTimeout(loopFetchParams, 10);
         }
     }
     loopFetchParams();    

@@ -5,7 +5,7 @@ import time
 app = Flask(__name__)
 CORS(app)
 
-globalEnableDictation = True
+globalEnableDictation = False
 global_dictation = None
 global_upload_time = -1
 
