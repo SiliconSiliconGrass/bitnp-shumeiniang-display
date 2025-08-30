@@ -39,7 +39,7 @@ function areBracketsBalanced(str) {
     return openBracketCount === closeBracketCount;
 }
 
-const MIN_SENTENCE_LENGTH = 8;
+const MIN_SENTENCE_LENGTH = 3;
 
 const msgDelta = (self, event) => {
     // 定义收到流式请求中的message delta时的处理过程
@@ -51,8 +51,9 @@ const msgDelta = (self, event) => {
 
     if (!areBracketsBalanced(self.buffer)) return; // 若不匹配，则暂不处理
 
-    const seps = "。？！；.?!;\n、";
-    // const seps = "。？！；.?!;\n";
+    // const seps = "。？！；.?!;\n、";
+    // const seps = "。？！；.?!;\n、，,";
+    const seps = "。？！；.?!;\n";
     let splitList = self.buffer.split('[');
 
     if (splitList.length === 1 && multipleSplit(self.buffer, seps).length === 1) {

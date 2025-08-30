@@ -28,7 +28,8 @@ export function ShuMeiNiang(live2dCanvas, subtitle, transSubtitle, danmukuArea) 
             type: 'GLM',
             token: getToken('glm'),
             modelName: 'glm-4-flash-250414',
-            systemPrompt: live2dPrompter(PROMPT, LIVE2D_CONFIG, 'zh')
+            // systemPrompt: live2dPrompter(PROMPT, LIVE2D_CONFIG, 'zh')
+            systemPrompt: PROMPT
         },
         queryTemplate: '%USER_INPUT% \n %PLUGIN_INFO% \n',
 
@@ -60,7 +61,7 @@ export function ShuMeiNiang(live2dCanvas, subtitle, transSubtitle, danmukuArea) 
 
 
                     "text": "",
-                    "speaker": "yui"
+                    "speaker": "paimeng" // 使用派蒙语音
 
                 }, translationConfig: null
             }],

@@ -12,8 +12,8 @@ from silero_vad import load_silero_vad, get_speech_timestamps
 
 STT_BACKEND_PORT = 9236 # stt backend port
 
-DEVICE_INDEX = 1 # 使用 iPhone 麦克风
-# DEVICE_INDEX = 3 # 使用 Mac 麦克风
+# DEVICE_INDEX = 1 # 使用 iPhone 麦克风 / USB 麦克风
+DEVICE_INDEX = 3 # 使用 Mac 麦克风
 
 # 初始化模型
 vad_model = load_silero_vad() # 语音检测模型 (VAD)
@@ -96,16 +96,18 @@ def vad_callback(indata, frames, time, status):
         print(f"🔇 语音结束 @ {t.strftime('%H:%M:%S', t.localtime(t.time()))}")
 
 
-# # 查看所有音频设备
-# # debug
-# devices = sd.query_devices()
-# print("所有音频设备:")
-# for i, device in enumerate(devices):
-#     print(f"设备索引 {i}: {device['name']}")
-#     print(f"  最大输入通道: {device['max_input_channels']}")
-#     print(f"  最大输出通道: {device['max_output_channels']}")
-#     print(f"  默认采样率: {device['default_samplerate']}")
-#     print("  ---")
+# 查看所有音频设备
+# debug
+devices = sd.query_devices()
+print("所有音频设备:")
+for i, device in enumerate(devices):
+    print(f"设备索引 {i}: {device['name']}")
+    print(f"  最大输入通道: {device['max_input_channels']}")
+    print(f"  最大输出通道: {device['max_output_channels']}")
+    print(f"  默认采样率: {device['default_samplerate']}")
+    print("  ---")
+print(f"using {devices[DEVICE_INDEX]}")
+time.sleep(2)
 
 # 开始实时流式检测
 print("开始流式VAD检测 (按Ctrl+C停止)...")

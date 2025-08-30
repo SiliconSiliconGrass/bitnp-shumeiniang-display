@@ -159,7 +159,9 @@ export async function live2d_setup(canvas, modelURL, vueCore) {
         // 处理模型更新
         const coreModel = model.internalModel.coreModel;
         for (let paramName in dictParams) {
-            coreModel.setParameterValueById(paramName, dictParams[paramName]);
+            if (!isNaN(dictParams[paramName])) {
+                coreModel.setParameterValueById(paramName, dictParams[paramName]);
+            }
         }
 
         // debug
@@ -172,13 +174,19 @@ export async function live2d_setup(canvas, modelURL, vueCore) {
     }
 
     // 覆盖focus函数
-    model.internalModel.focusController.old_update = model.internalModel.focusController.update
+    model.internalModel.focusController.old_update = model.internalModel.focusController.update;
     model.internalModel.focusController.update = function (...args) {
-        // model.internalModel.focusController.targetX = dictParams["ParamAngleX"] || 0;
-        // model.internalModel.focusController.targetY = dictParams["ParamAngleY"] || 0;
+        let angleX = dictParams["ParamAngleX"];
+            if (isNaN(angleX)) {
+                angleX = 0;
+            }
+            let angleY = dictParams["ParamAngleY"];
+            if (isNaN(angleY)) {
+                angleY = 0;
+            }
 
-        model.internalModel.focusController.focus(dictParams["ParamAngleX"] / 30, dictParams["ParamAngleY"] / 30)
-        model.internalModel.focusController.old_update(...args)
+        model.internalModel.focusController.focus(angleX / 30, angleY / 30);
+        model.internalModel.focusController.old_update(...args);
     }
 
     // 覆盖模型的update函数，以实现自定义参数更新
