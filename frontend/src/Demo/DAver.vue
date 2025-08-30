@@ -27,6 +27,11 @@
                 <input type="checkbox" v-model="enableFullScreen">
                 全屏模式
             </label><br>
+
+            <label>
+                <input type="checkbox" v-model="allowPauseDictation">
+                在 AI 说话时禁用语音识别
+            </label><br>
             
         </div>
 
@@ -118,6 +123,7 @@ export default {
             showConfigUI: false,
             enableDictation: false,
             enableFullScreen: false,
+            allowPauseDictation: true,
         };
     },
 
@@ -319,7 +325,7 @@ export default {
 
         // 1.4 stt message sender loop
         const sttMessageSenderLoopId = setInterval(() => {
-            if (self.enableDictation && !inResponse) {
+            if ((self.enableDictation && !inResponse) || (!self.allowPauseDictation)) {
                 self.resumeDictation();
             } else {
                 self.pauseDictation();
